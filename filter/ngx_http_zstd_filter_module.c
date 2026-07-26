@@ -79,6 +79,21 @@ static ngx_http_output_body_filter_pt  ngx_http_next_body_filter;
 static ngx_str_t  ngx_http_zstd_ratio = ngx_string("zstd_ratio");
 
 
+/*
+ * Default zstd_types. text/html is always compressed and cannot be disabled,
+ * matching nginx's own gzip_types. WebAssembly and WGSL are added because both
+ * are text-like formats served with a non-text media type, so they compress
+ * well but are missed by every configuration that never listed them.
+ */
+
+static ngx_str_t  ngx_http_zstd_default_types[] = {
+    ngx_string("text/html"),
+    ngx_string("application/wasm"),
+    ngx_string("text/wgsl"),
+    ngx_null_string
+};
+
+
 static ngx_int_t ngx_http_zstd_header_filter(ngx_http_request_t *r);
 static ngx_int_t ngx_http_zstd_body_filter(ngx_http_request_t *r,
     ngx_chain_t *in);
@@ -91,6 +106,7 @@ static ZSTD_CStream *ngx_http_zstd_filter_create_cstream(ngx_http_request_t *r,
 static ngx_int_t ngx_http_zstd_filter_compress(ngx_http_request_t *r,
     ngx_http_zstd_ctx_t *ctx);
 static ngx_int_t ngx_http_zstd_ok(ngx_http_request_t *r);
+static void ngx_http_zstd_free_dict(void *data);
 static ngx_int_t ngx_http_zstd_filter_init(ngx_conf_t *cf);
 static void * ngx_http_zstd_create_main_conf(ngx_conf_t *cf);
 static char *ngx_http_zstd_init_main_conf(ngx_conf_t *cf, void *conf);
@@ -133,7 +149,7 @@ static ngx_command_t  ngx_http_zstd_filter_commands[] = {
       ngx_http_types_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_zstd_loc_conf_t, types_keys),
-      &ngx_http_html_default_types[0] },
+      &ngx_http_zstd_default_types[0] },
 
     { ngx_string("zstd_buffers"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
@@ -143,7 +159,7 @@ static ngx_command_t  ngx_http_zstd_filter_commands[] = {
       NULL },
 
     { ngx_string("zstd_min_length"),
-      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_size_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
       offsetof(ngx_http_zstd_loc_conf_t, min_length),
@@ -373,10 +389,12 @@ ngx_http_zstd_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             if (ZSTD_isError(rv)) {
                 ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
                               "ZSTD_freeCStream() failed: %s",
-                              ZSTD_getErrorName(rc));
+                              ZSTD_getErrorName(rv));
 
                 rc = NGX_ERROR;
             }
+
+            ctx->cstream = NULL;
 
             return rc;
         }
@@ -385,10 +403,16 @@ ngx_http_zstd_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 failed:
 
     ctx->done = 1;
-    rv = ZSTD_freeCStream(ctx->cstream);
-    if (ZSTD_isError(rv)) {
-        ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
-                      "ZSTD_freeCStream() failed: %s", ZSTD_getErrorName(rv));
+
+    if (ctx->cstream) {
+        rv = ZSTD_freeCStream(ctx->cstream);
+        if (ZSTD_isError(rv)) {
+            ngx_log_error(NGX_LOG_ALERT, r->connection->log, 0,
+                          "ZSTD_freeCStream() failed: %s",
+                          ZSTD_getErrorName(rv));
+        }
+
+        ctx->cstream = NULL;
     }
 
     return NGX_ERROR;
@@ -564,6 +588,20 @@ ngx_http_zstd_filter_get_buf(ngx_http_request_t *r, ngx_http_zstd_ctx_t *ctx)
         ctx->out_buf = cl->buf;
         ngx_free_chain(r->pool, cl);
 
+        /*
+         * ngx_chain_update_chains() rewinds pos and last for us, but it leaves
+         * the control flags alone, and a buffer comes back round still carrying
+         * whatever it was sent with. ngx_http_zstd_filter_compress() only
+         * assigns flush and last_buf on the branch where the frame ends, so a
+         * stale flag would be re-emitted on an unrelated buffer and mark the
+         * response complete early.
+         */
+
+        ctx->out_buf->flush = 0;
+        ctx->out_buf->last_buf = 0;
+        ctx->out_buf->last_in_chain = 0;
+        ctx->out_buf->shadow = NULL;
+
     } else if (ctx->bufs < zlcf->bufs.num) {
         ctx->out_buf = ngx_create_temp_buf(r->pool, zlcf->bufs.size);
         if (ctx->out_buf == NULL) {
@@ -682,6 +720,17 @@ ngx_http_zstd_ok(ngx_http_request_t *r)
 }
 
 
+static void
+ngx_http_zstd_free_dict(void *data)
+{
+    ZSTD_CDict  *dict = data;
+
+    if (dict != NULL) {
+        ZSTD_freeCDict(dict);
+    }
+}
+
+
 static void *
 ngx_http_zstd_create_main_conf(ngx_conf_t *cf)
 {
@@ -752,6 +801,7 @@ ngx_http_zstd_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
     char                       *rc;
     u_char                     *buf;
     ngx_file_info_t             info;
+    ngx_pool_cleanup_t         *cln;
     ngx_http_zstd_main_conf_t  *zmcf;
 
     rc = NGX_OK;
@@ -764,7 +814,7 @@ ngx_http_zstd_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
 
     if (ngx_http_merge_types(cf, &conf->types_keys, &conf->types,
                              &prev->types_keys, &prev->types,
-                             ngx_http_html_default_types))
+                             ngx_http_zstd_default_types))
     {
         return NGX_CONF_ERROR;
     }
@@ -838,6 +888,24 @@ ngx_http_zstd_merge_loc_conf(ngx_conf_t *cf, void *parent, void *child)
                 rc = NGX_CONF_ERROR;
                 goto close;
             }
+
+            /*
+             * The dictionary is libzstd-allocated, so the configuration pool
+             * going away does not release it. Without a cleanup handler every
+             * reload of a configuration using zstd_dict_file leaks one
+             * dictionary for the lifetime of the master process.
+             */
+
+            cln = ngx_pool_cleanup_add(cf->pool, 0);
+            if (cln == NULL) {
+                ZSTD_freeCDict(conf->dict);
+                conf->dict = NULL;
+                rc = NGX_CONF_ERROR;
+                goto close;
+            }
+
+            cln->handler = ngx_http_zstd_free_dict;
+            cln->data = conf->dict;
         }
     }
 
