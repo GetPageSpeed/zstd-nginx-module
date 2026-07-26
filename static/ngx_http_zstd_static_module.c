@@ -197,6 +197,17 @@ ngx_http_zstd_static_handler(ngx_http_request_t *r)
         }
     }
 
+    /*
+     * We are committed to serving the precompressed file now, so suppress
+     * gzip for this request. This must not happen any earlier: every path
+     * above can still decline (no .zst on disk, a directory, a client that
+     * does not accept zstd), and a request we decline has to remain eligible
+     * for gzip_static and for the gzip filter.
+     */
+
+    r->gzip_tested = 1;
+    r->gzip_ok = 0;
+
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "http static fd: %d", of.fd);
 
     if (of.is_dir) {
@@ -304,10 +315,6 @@ ngx_http_zstd_ok(ngx_http_request_t *r)
     {
         return NGX_DECLINED;
     }
-
-
-    r->gzip_tested = 1;
-    r->gzip_ok = 0;
 
     return NGX_OK;
 }

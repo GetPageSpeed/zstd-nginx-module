@@ -219,6 +219,15 @@ ngx_http_zstd_header_filter(ngx_http_request_t *r)
         return ngx_http_next_header_filter(r);
     }
 
+    /*
+     * We are committed to compressing this response, so suppress gzip for it.
+     * ngx_http_zstd_ok() deliberately leaves these flags alone: a request it
+     * declines must stay eligible for gzip.
+     */
+
+    r->gzip_tested = 1;
+    r->gzip_ok = 0;
+
     ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_zstd_ctx_t));
     if (ctx == NULL) {
         return NGX_ERROR;
@@ -700,10 +709,6 @@ ngx_http_zstd_ok(ngx_http_request_t *r)
     {
         return NGX_DECLINED;
     }
-
-
-    r->gzip_tested = 1;
-    r->gzip_ok = 0;
 
     return NGX_OK;
 }
