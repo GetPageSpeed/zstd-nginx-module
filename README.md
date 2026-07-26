@@ -24,7 +24,17 @@ zstd-nginx-module - Nginx module for the [Zstandard compression](https://faceboo
 
 # Status
 
-This Nginx module is currently considered experimental. Issues and PRs are welcome if you encounter any problems.
+Actively maintained by [GetPageSpeed](https://www.getpagespeed.com/). This repository continues
+the original [tokers/zstd-nginx-module](https://github.com/tokers/zstd-nginx-module) by Alex Zhang,
+which has not seen a release since 2023. It carries HTTP correctness fixes, memory-management
+fixes and an RFC 9110 compliant `Accept-Encoding` parser on top of that base, plus a test suite
+and static-analysis CI.
+
+Issues and PRs are welcome if you encounter any problems.
+
+Prebuilt packages for RHEL/CentOS/Rocky/Alma, Fedora, Amazon Linux, SLES, Debian and Ubuntu are
+available as `nginx-module-zstd` from
+[GetPageSpeed extras](https://nginx-extras.getpagespeed.com/modules/zstd/).
 
 # Synopsis
 
@@ -148,8 +158,11 @@ Achieved compression ratio, computed as the ratio between the original and compr
 
 # Author
 
-Alex Zhang (张超) zchao1995@gmail.com, UPYUN Inc.
+Original author: Alex Zhang (张超) zchao1995@gmail.com, UPYUN Inc.
+
+Maintained by GetPageSpeed LLC.
 
 # License
 
-This Nginx module is licensed under [BSD 2-Clause License](LICENSE).
+This Nginx module is licensed under [BSD 2-Clause License](LICENSE). See [NOTICE](NOTICE) for
+provenance.
