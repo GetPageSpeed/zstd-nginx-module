@@ -120,10 +120,12 @@ Sets the minimum length of a response that will be compressed by zstd. The lengt
 ### zstd_types
 
 **Syntax:** *zstd_types mime-type ...;*  
-**Default:** *zstd_types text/html;*  
+**Default:** *zstd_types text/html application/wasm text/wgsl;*  
 **Context:** *http, server, location*
 
 Enables zstd of responses for the specified MIME types in addition to `text/html`. The special value `*` matches any MIME type.
+
+`application/wasm` and `text/wgsl` are compressed by default: both are text-like formats served under a non-text media type, so they compress well but are easy to overlook. Specifying `zstd_types` explicitly replaces the defaults other than `text/html`, which is always included.
 
 ### zstd_buffers
 
@@ -146,6 +148,8 @@ The `ngx_http_zstd_static_module` module allows sending precompressed files with
 Enables ("on") or disables ("off") checking the existence of precompressed files. The following directives are also taken into account: `gzip_vary`.
 
 With the _"always"_ value, "zstd" file is used in all cases, without checking if the client supports it.
+
+When no `.zst` file exists the request is declined unchanged, so `gzip_static` and the `gzip` filter still apply as they normally would.
 
 
 # Variables
