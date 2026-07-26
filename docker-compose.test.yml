@@ -1,0 +1,13 @@
+services:
+  tests:
+    image: ngx-zstd-tests-base:release-1.30.4
+    volumes:
+      - .:/work
+    working_dir: /work
+    environment:
+      - TEST_NGINX_USE_HUP=1
+      - TEST_NGINX_FAST_SHUTDOWN=1
+      - TEST_NGINX_NO_CLEAN=1
+      - TEST_NGINX_LOG_LEVEL=debug
+      - TEST_NGINX_ERROR_LOG=/work/test-error.log
+    entrypoint: ["/work/docker-run-tests.sh"]

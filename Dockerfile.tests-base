@@ -1,0 +1,31 @@
+FROM ubuntu:24.04
+
+ARG NGINX_VERSION=release-1.30.4
+
+# libzstd-dev ships both libzstd.a and libzstd.so; the module's config prefers
+# the static library because it uses ZSTD_STATIC_LINKING_ONLY APIs.
+# zstd(1) is used by the test suite to produce .zst fixtures for zstd_static.
+RUN apt-get update --yes && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes \
+      build-essential ca-certificates wget git curl \
+      libpcre3-dev libssl-dev zlib1g-dev \
+      libzstd-dev zstd \
+      cppcheck \
+      perl cpanminus && \
+    cpanm --notest --local-lib=/usr/local/perl5 Test::Nginx::Socket && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV PERL5LIB=/usr/local/perl5/lib/perl5
+
+WORKDIR /opt/nginx-src
+RUN git clone https://github.com/nginx/nginx.git . && \
+    git fetch --tags && \
+    git checkout "$NGINX_VERSION"
+
+# gzip_static is required: one of our regression tests asserts that zstd_static
+# does not suppress the gzip_static fallback when no .zst file exists.
+RUN ./auto/configure --with-debug --with-compat \
+      --with-http_gzip_static_module && \
+    make -j"$(nproc)"
+
+ENV TEST_NGINX_BINARY=/opt/nginx-src/objs/nginx
