@@ -52,3 +52,8 @@ Mkfile.old
 dkms.conf
 
 t/servroot/*
+
+# Test harness artifacts
+t/servroot*/
+test-error.log
+test-error-asan.log
