@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      NGINX_VERSION: release-1.30.4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build base image
+        run: make base-image NGINX_VERSION=${NGINX_VERSION}
+
+      - name: Run test suite
+        run: make tests NGINX_VERSION=${NGINX_VERSION}
+
+  test-asan:
+    runs-on: ubuntu-latest
+    env:
+      NGINX_VERSION: release-1.30.4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build base image
+        run: make base-image NGINX_VERSION=${NGINX_VERSION}
+
+      # Rebuilds nginx with the module linked in statically under
+      # -fsanitize=address; a dynamic module loaded into a non-ASAN nginx
+      # cannot be sanitized. Fails on any sanitizer report even if prove passed.
+      - name: Run test suite under AddressSanitizer
+        run: make tests-asan NGINX_VERSION=${NGINX_VERSION}

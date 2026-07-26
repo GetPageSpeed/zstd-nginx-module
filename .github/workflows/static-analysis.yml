@@ -1,0 +1,62 @@
+name: Static Analysis
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    env:
+      NGINX_VERSION: release-1.30.4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # cppcheck runs inside the test base image so that it resolves the nginx
+      # headers under /opt/nginx-src and reports on our sources only.
+      - name: Build base image (provides nginx headers + cppcheck)
+        run: |
+          docker build --pull \
+            --build-arg NGINX_VERSION=${NGINX_VERSION} \
+            -f Dockerfile.tests-base \
+            -t ngx-zstd-tests-base:${NGINX_VERSION} .
+
+      - name: Run cppcheck
+        run: make lint NGINX_VERSION=${NGINX_VERSION}
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    env:
+      NGINX_VERSION: release-1.30.4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          config-file: ./.github/codeql/codeql-config.yml
+
+      # autobuild cannot drive nginx's auto/configure, so build by hand.
+      - name: Build nginx with the module (static)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libzstd-dev \
+            libpcre3-dev libssl-dev zlib1g-dev git
+          git clone --depth 1 --branch "${NGINX_VERSION}" \
+            https://github.com/nginx/nginx.git /tmp/nginx-src
+          cd /tmp/nginx-src
+          ./auto/configure --with-compat --with-http_gzip_static_module \
+            --add-module="${GITHUB_WORKSPACE}"
+          make -j"$(nproc)"
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3

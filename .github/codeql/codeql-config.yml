@@ -1,0 +1,9 @@
+name: "CodeQL config"
+
+# Scope results to this module's own sources. The CodeQL build compiles the
+# whole of nginx to get a database, and without this every finding in nginx
+# core would be reported as ours.
+paths:
+  - filter
+  - static
+  - ngx_http_zstd_accept_encoding.h

@@ -25,6 +25,7 @@ if [ "$ASAN" = "1" ]; then
     # reports "found but is not working" for both the static and shared library.
     # nginx also leaves benign allocations live at the point Test::Nginx kills
     # it. Reports go to per-pid files we scan after the run.
+    rm -rf /tmp/asan
     mkdir -p /tmp/asan
     export ASAN_OPTIONS="detect_leaks=0:abort_on_error=1:log_path=/tmp/asan/asan"
 
@@ -61,9 +62,14 @@ if [ "$ASAN" = "1" ]; then
     set -e
     # Fail the run if ASan/UBSan wrote any report, even when prove passed: a
     # sanitized worker can crash without failing every test assertion.
-    if grep -q "AddressSanitizer\|runtime error" /tmp/asan/asan.* 2>/dev/null; then
+    #
+    # The glob is "asan*", not "asan.*". Test::Nginx sets its own ASAN_OPTIONS
+    # per test block and appends the block name to log_path, so reports land as
+    # asan-<testfile>-t<n>.<pid> rather than asan.<pid>. Matching on "asan.*"
+    # silently finds nothing and the gate never fires.
+    if grep -q "AddressSanitizer\|runtime error" /tmp/asan/asan* 2>/dev/null; then
         echo "=== AddressSanitizer / UBSan reports detected ===" >&2
-        cat /tmp/asan/asan.* >&2
+        cat /tmp/asan/asan* >&2
         exit 1
     fi
     exit $rc
