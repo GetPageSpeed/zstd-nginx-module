@@ -19,6 +19,15 @@ cd "$NGINX_SRC"
 rm -rf objs/addon objs/ngx_modules.c 2>/dev/null || true
 
 if [ "$ASAN" = "1" ]; then
+    # LSAN off, and it must be off before ./auto/configure runs, not just for
+    # the test run: the module's libzstd feature test calls ZSTD_createCCtx()
+    # without freeing it, so LeakSanitizer fails that probe at exit and nginx
+    # reports "found but is not working" for both the static and shared library.
+    # nginx also leaves benign allocations live at the point Test::Nginx kills
+    # it. Reports go to per-pid files we scan after the run.
+    mkdir -p /tmp/asan
+    export ASAN_OPTIONS="detect_leaks=0:abort_on_error=1:log_path=/tmp/asan/asan"
+
     # Static --add-module build with AddressSanitizer. A dynamic module loaded
     # into a non-ASAN nginx cannot be sanitized, so we link everything into one
     # instrumented binary.
@@ -26,11 +35,6 @@ if [ "$ASAN" = "1" ]; then
         --with-cc-opt="-fsanitize=address -fno-omit-frame-pointer -g" \
         --with-ld-opt="-fsanitize=address"
     make -j"$(nproc)"
-
-    # LSAN off: nginx leaves benign allocations live at the point Test::Nginx
-    # kills it. Write reports to per-pid files we scan after the run.
-    mkdir -p /tmp/asan
-    export ASAN_OPTIONS="detect_leaks=0:abort_on_error=1:log_path=/tmp/asan/asan"
 else
     ./auto/configure "${CONFIGURE_ARGS[@]}"
     make -j"$(nproc)"
