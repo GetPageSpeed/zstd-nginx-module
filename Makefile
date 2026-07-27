@@ -1,4 +1,4 @@
-.PHONY: test tests build clean shell base-image lint tests-asan
+.PHONY: test tests test-dynamic-debian12 build clean shell base-image lint tests-asan
 
 BASE_IMAGE ?= ngx-zstd-tests-base
 NGINX_VERSION ?= release-1.30.4
@@ -21,6 +21,12 @@ tests: build
 		tests $(T)
 
 test: tests
+
+test-dynamic-debian12:
+	$(DOCKER) build --pull \
+		--build-arg NGINX_VERSION=$(NGINX_VERSION) \
+		-f Dockerfile.dynamic-debian12 \
+		-t ngx-zstd-dynamic-debian12:$(NGINX_VERSION) .
 
 shell: build
 	$(DOCKER) compose -f docker-compose.test.yml run --rm tests /bin/bash

@@ -1,0 +1,20 @@
+FROM debian:12-slim
+
+ARG NGINX_VERSION=release-1.30.4
+
+RUN apt-get update --yes && \
+    DEBIAN_FRONTEND=noninteractive apt-get install --yes --no-install-recommends \
+      build-essential ca-certificates git \
+      libpcre3-dev libssl-dev zlib1g-dev libzstd-dev binutils && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY . /module
+
+WORKDIR /opt/nginx-src
+RUN git clone --depth 1 --branch "$NGINX_VERSION" \
+      https://github.com/nginx/nginx.git . && \
+    ./auto/configure --with-compat --add-dynamic-module=/module && \
+    make -j"$(nproc)" modules && \
+    readelf -d objs/ngx_http_zstd_filter_module.so | \
+      grep 'Shared library: \[libzstd.so' && \
+    ! readelf -d objs/ngx_http_zstd_static_module.so | grep libzstd

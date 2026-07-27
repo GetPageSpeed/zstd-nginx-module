@@ -8,6 +8,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#define ZSTD_STATIC_LINKING_ONLY
 #include <zstd.h>
 
 #include "../ngx_http_zstd_accept_encoding.h"
