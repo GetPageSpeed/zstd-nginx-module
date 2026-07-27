@@ -12,7 +12,8 @@ jobs:
     steps:
       - name: Trigger yml2spec-nginx-module pipeline
         run: |
-          curl -X POST "https://circleci.com/api/v2/project/bb/danila_vershinin/yml2spec-nginx-module/pipeline" \
+          curl --fail-with-body --silent --show-error \
+            --request POST "https://circleci.com/api/v2/project/bb/danila_vershinin/yml2spec-nginx-module/pipeline" \
             -H "Circle-Token: ${{ secrets.CIRCLECI_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{
@@ -31,7 +32,8 @@ jobs:
     steps:
       - name: Trigger yml2deb-nginx-module pipeline
         run: |
-          curl -X POST "https://circleci.com/api/v2/project/bb/danila_vershinin/yml2deb-nginx-module/pipeline" \
+          curl --fail-with-body --silent --show-error \
+            --request POST "https://circleci.com/api/v2/project/bb/danila_vershinin/yml2deb-nginx-module/pipeline" \
             -H "Circle-Token: ${{ secrets.CIRCLECI_TOKEN }}" \
             -H "Content-Type: application/json" \
             -d '{
