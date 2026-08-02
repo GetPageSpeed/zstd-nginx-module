@@ -1,0 +1,5 @@
+# Override the global LLM-context line limit for this repository.
+# filter/ngx_http_zstd_filter_module.c is an upstream-origin single
+# compilation unit kept intact so upstream fixes remain straightforward to
+# merge. Keep a narrow ceiling above its current 1077 lines.
+max_lines: 1200
