@@ -4,7 +4,9 @@ BASE_IMAGE ?= ngx-zstd-tests-base
 NGINX_VERSION ?= release-1.30.4
 DOCKER ?= docker
 
-MODULE_SRCS = filter/ngx_http_zstd_filter_module.c static/ngx_http_zstd_static_module.c
+MODULE_SRCS = filter/ngx_http_zstd_filter_module.c \
+	filter/ngx_http_zstd_filter.c \
+	static/ngx_http_zstd_static_module.c
 
 base-image:
 	$(DOCKER) build --pull \
