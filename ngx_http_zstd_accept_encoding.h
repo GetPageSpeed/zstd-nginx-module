@@ -316,4 +316,102 @@ ngx_http_zstd_accept_encoding(ngx_str_t *ae)
 }
 
 
+static ngx_inline ngx_uint_t
+ngx_http_zstd_vary_has_accept_encoding(ngx_http_request_t *r)
+{
+    u_char           *end, *p, *start;
+    ngx_uint_t        i;
+    ngx_list_part_t  *part;
+    ngx_table_elt_t  *h;
+
+    for (part = &r->headers_out.headers.part, h = part->elts, i = 0;
+         /* void */;
+         i++)
+    {
+        if (i >= part->nelts) {
+            if (part->next == NULL) {
+                break;
+            }
+
+            part = part->next;
+            h = part->elts;
+            i = 0;
+        }
+
+        if (h[i].hash == 0
+            || h[i].key.len != sizeof("Vary") - 1
+            || ngx_strncasecmp(h[i].key.data, (u_char *) "Vary",
+                               sizeof("Vary") - 1) != 0)
+        {
+            continue;
+        }
+
+        p = h[i].value.data;
+        end = p + h[i].value.len;
+
+        while (p < end) {
+            while (p < end && (*p == ' ' || *p == '\t' || *p == ',')) {
+                p++;
+            }
+
+            start = p;
+            while (p < end && *p != ',') {
+                p++;
+            }
+
+            while (p > start && (p[-1] == ' ' || p[-1] == '\t')) {
+                p--;
+            }
+
+            if ((p - start == 1 && *start == '*')
+                || ((size_t) (p - start) == sizeof("Accept-Encoding") - 1
+                    && ngx_strncasecmp(start, (u_char *) "Accept-Encoding",
+                                       sizeof("Accept-Encoding") - 1) == 0))
+            {
+                return 1;
+            }
+
+            while (p < end && *p != ',') {
+                p++;
+            }
+        }
+    }
+
+    return 0;
+}
+
+
+static ngx_inline ngx_int_t
+ngx_http_zstd_vary_accept_encoding(ngx_http_request_t *r)
+{
+    ngx_table_elt_t           *h;
+    ngx_http_core_loc_conf_t  *clcf;
+
+    r->gzip_vary = 1;
+
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
+    if (clcf != NULL && clcf->gzip_vary) {
+        return NGX_OK;
+    }
+
+    if (ngx_http_zstd_vary_has_accept_encoding(r)) {
+        return NGX_OK;
+    }
+
+    h = ngx_list_push(&r->headers_out.headers);
+    if (h == NULL) {
+        return NGX_ERROR;
+    }
+
+    h->hash = 1;
+#if (nginx_version >= 1023000)
+    h->next = NULL;
+#endif
+    ngx_str_set(&h->key, "Vary");
+    ngx_str_set(&h->value, "Accept-Encoding");
+
+    return NGX_OK;
+}
+
+
 #endif /* NGX_HTTP_ZSTD_ACCEPT_ENCODING_H_INCLUDED_ */

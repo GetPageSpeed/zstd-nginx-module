@@ -43,6 +43,7 @@ GET /t
 Accept-Encoding: gzip, deflate
 --- response_headers
 !Content-Encoding
+Vary: Accept-Encoding
 --- no_error_log
 [error]
 
@@ -61,6 +62,7 @@ Accept-Encoding: gzip, deflate
 GET /t
 --- response_headers
 !Content-Encoding
+Vary: Accept-Encoding
 --- no_error_log
 [error]
 
@@ -214,5 +216,84 @@ Range: bytes=0-99
 --- response_headers
 !Content-Encoding
 Content-Length: 100
+--- no_error_log
+[error]
+
+
+
+=== TEST 11: eligible 201 responses are compressed
+--- config
+    location /t {
+        zstd on;
+        zstd_min_length 1;
+        zstd_types text/plain;
+        default_type text/plain;
+        return 201 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    }
+--- request
+GET /t
+--- more_headers
+Accept-Encoding: zstd
+--- error_code: 201
+--- response_headers
+Content-Encoding: zstd
+Vary: Accept-Encoding
+--- no_error_log
+[error]
+
+
+
+=== TEST 12: 204 responses remain bodyless and unencoded
+--- config
+    location /t {
+        zstd on;
+        return 204;
+    }
+--- request
+GET /t
+--- more_headers
+Accept-Encoding: zstd
+--- error_code: 204
+--- response_headers
+!Content-Encoding
+--- no_error_log
+[error]
+
+
+
+=== TEST 13: 205 responses remain bodyless and unencoded
+--- config
+    location /t {
+        zstd on;
+        return 205;
+    }
+--- request
+GET /t
+--- more_headers
+Accept-Encoding: zstd
+--- error_code: 205
+--- response_headers
+!Content-Encoding
+--- no_error_log
+[error]
+
+
+
+=== TEST 14: an explicit 206 response is not dynamically compressed
+--- config
+    location /t {
+        zstd on;
+        zstd_min_length 1;
+        zstd_types text/plain;
+        default_type text/plain;
+        return 206 'partial response body';
+    }
+--- request
+GET /t
+--- more_headers
+Accept-Encoding: zstd
+--- error_code: 206
+--- response_headers
+!Content-Encoding
 --- no_error_log
 [error]

@@ -1,8 +1,12 @@
 ngx_feature_incs="#define ZSTD_STATIC_LINKING_ONLY
 #include <zstd.h>"
-ngx_feature_test="(void) ZSTD_createCStream_advanced((ZSTD_customMem) {0});"
+ngx_feature_test="(void) ZSTD_createCStream_advanced((ZSTD_customMem) {0});
+                  (void) ZSTD_compressStream2((ZSTD_CCtx *) 0,
+                                              (ZSTD_outBuffer *) 0,
+                                              (ZSTD_inBuffer *) 0,
+                                              ZSTD_e_continue);"
 ngx_feature_libs=
-ngx_feature_run=yes
+ngx_feature_run=no
 
 ngx_zstd_opt_L=
 

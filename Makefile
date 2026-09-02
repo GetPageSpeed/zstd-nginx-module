@@ -3,13 +3,15 @@
 BASE_IMAGE ?= ngx-zstd-tests-base
 NGINX_VERSION ?= release-1.30.4
 DOCKER ?= docker
+# Use PULL=--pull when an explicit base-image refresh is wanted.
+PULL ?=
 
 MODULE_SRCS = filter/ngx_http_zstd_filter_module.c \
 	filter/ngx_http_zstd_filter.c \
 	static/ngx_http_zstd_static_module.c
 
 base-image:
-	$(DOCKER) build --pull \
+	$(DOCKER) build $(PULL) \
 		--build-arg NGINX_VERSION=$(NGINX_VERSION) \
 		-f Dockerfile.tests-base \
 		-t $(BASE_IMAGE):$(NGINX_VERSION) .

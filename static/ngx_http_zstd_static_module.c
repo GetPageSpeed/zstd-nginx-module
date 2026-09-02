@@ -85,7 +85,7 @@ static ngx_int_t
 ngx_http_zstd_static_handler(ngx_http_request_t *r)
 {
     u_char                       *p;
-    ngx_int_t                     rc;
+    ngx_int_t                     accepts, rc;
     ngx_uint_t                    level;
     size_t                        root;
     ngx_str_t                     path;
@@ -112,17 +112,13 @@ ngx_http_zstd_static_handler(ngx_http_request_t *r)
     }
 
     if (zscf->enable == NGX_HTTP_ZSTD_STATIC_ON) {
-        rc = ngx_http_zstd_ok(r);
+        accepts = ngx_http_zstd_ok(r);
 
     } else {
-        rc = NGX_OK;
+        accepts = NGX_OK;
     }
 
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_core_module);
-
-    if (!clcf->gzip_vary && rc != NGX_OK) {
-        return NGX_DECLINED;
-    }
 
     log = r->connection->log;
 
@@ -190,25 +186,6 @@ ngx_http_zstd_static_handler(ngx_http_request_t *r)
         return NGX_DECLINED;
     }
 
-    if (zscf->enable == NGX_HTTP_ZSTD_STATIC_ON) {
-        r->gzip_vary = 1;
-
-        if (rc != NGX_OK) {
-            return NGX_DECLINED;
-        }
-    }
-
-    /*
-     * We are committed to serving the precompressed file now, so suppress
-     * gzip for this request. This must not happen any earlier: every path
-     * above can still decline (no .zst on disk, a directory, a client that
-     * does not accept zstd), and a request we decline has to remain eligible
-     * for gzip_static and for the gzip filter.
-     */
-
-    r->gzip_tested = 1;
-    r->gzip_ok = 0;
-
     ngx_log_debug1(NGX_LOG_DEBUG_HTTP, log, 0, "http static fd: %d", of.fd);
 
     if (of.is_dir) {
@@ -226,6 +203,20 @@ ngx_http_zstd_static_handler(ngx_http_request_t *r)
     }
 
 #endif
+
+    if (zscf->enable == NGX_HTTP_ZSTD_STATIC_ON) {
+        if (ngx_http_zstd_vary_accept_encoding(r) != NGX_OK) {
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        }
+
+        if (accepts != NGX_OK) {
+            return NGX_DECLINED;
+        }
+    }
+
+    /* All declining paths are behind us, so suppress gzip only now. */
+    r->gzip_tested = 1;
+    r->gzip_ok = 0;
 
     r->root_tested = !r->error_page;
 
@@ -254,9 +245,15 @@ ngx_http_zstd_static_handler(ngx_http_request_t *r)
     }
 
     h->hash = 1;
+#if (nginx_version >= 1023000)
+    h->next = NULL;
+#endif
     ngx_str_set(&h->key, "Content-Encoding");
     ngx_str_set(&h->value, "zstd");
     r->headers_out.content_encoding = h;
+
+    /* Ranges address the selected representation: the stable .zst bytes. */
+    r->allow_ranges = 1;
 
     b = ngx_calloc_buf(r->pool);
     if (b == NULL) {

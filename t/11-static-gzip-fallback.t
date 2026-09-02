@@ -101,3 +101,79 @@ Accept-Encoding: gzip, zstd
 Content-Encoding: gzip
 --- no_error_log
 [error]
+
+
+
+=== TEST 5: gzip_vary on does not make zstd_static ignore negotiation
+--- config
+    gzip_vary on;
+    location /t {
+        zstd_static on;
+        root html;
+        try_files /../../../t/suite/test =404;
+    }
+--- request
+GET /t
+--- response_headers
+!Content-Encoding
+Vary: Accept-Encoding
+--- no_error_log
+[error]
+
+
+
+=== TEST 6: negotiated static responses vary without gzip_vary
+--- config
+    location /t {
+        zstd_static on;
+        root html;
+        try_files /../../../t/suite/test =404;
+    }
+--- request
+GET /t
+--- more_headers
+Accept-Encoding: zstd
+--- response_headers
+Content-Encoding: zstd
+Vary: Accept-Encoding
+--- no_error_log
+[error]
+
+
+
+=== TEST 7: static identity fallback also varies without gzip_vary
+--- config
+    location /t {
+        zstd_static on;
+        root html;
+        try_files /../../../t/suite/test =404;
+    }
+--- request
+GET /t
+--- response_headers
+!Content-Encoding
+Vary: Accept-Encoding
+--- no_error_log
+[error]
+
+
+
+=== TEST 8: static zstd supports byte ranges of the selected representation
+--- config
+    location /t {
+        zstd_static on;
+        root html;
+        try_files /../../../t/suite/test =404;
+    }
+--- request
+GET /t
+--- more_headers
+Accept-Encoding: zstd
+Range: bytes=0-99
+--- error_code: 206
+--- response_headers
+Content-Encoding: zstd
+Content-Range: bytes 0-99/20706
+Content-Length: 100
+--- no_error_log
+[error]

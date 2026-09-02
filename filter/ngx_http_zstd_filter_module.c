@@ -372,7 +372,8 @@ ngx_http_zstd_ratio_variable(ngx_http_request_t *r,
     }
 
     ratio_int = (ngx_uint_t) ctx->bytes_in / ctx->bytes_out;
-    ratio_frac = (ngx_uint_t) (ctx->bytes_in * 1000 / ctx->bytes_out % 1000);
+    ratio_frac = (ngx_uint_t) ((uint64_t) ctx->bytes_in * 1000
+                              / ctx->bytes_out % 1000);
 
     vv->len = ngx_sprintf(vv->data, "%ui.%03ui", ratio_int, ratio_frac)
               - vv->data;

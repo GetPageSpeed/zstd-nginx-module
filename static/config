@@ -8,6 +8,7 @@ ngx_module_incs=
 ngx_module_deps=
 ngx_module_srcs=$HTTP_ZSTD_SRCS
 ngx_module_libs=
-ngx_module_order=
+ngx_module_order="ngx_http_brotli_static_module \
+                  $ngx_module_name"
 
 . auto/module

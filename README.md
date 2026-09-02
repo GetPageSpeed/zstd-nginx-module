@@ -70,11 +70,11 @@ server {
 
 # Installation
 
-To use theses modules, configure your nginx branch with `--add-module=/path/to/zstd-nginx-module`. Several points should be taken care of.
+To use these modules, configure your nginx branch with `--add-module=/path/to/zstd-nginx-module`.
 
-* You can set environment variables `ZSTD_INC` and `ZSTD_LIB` to specify the path to `zstd.h` and the path to zstd shared library respectively.
-* static library will be attempted prior to dynamic library, since this Nginx module uses some **advanced APIs** where static linking is recommended.
-* System's zstd bundle will be linked if `ZSTD_INC` and `ZSTD_LIB` are not specified.
+* You can set `ZSTD_INC` and `ZSTD_LIB` to the directories containing `zstd.h` and the zstd libraries. A custom shared-library path is also recorded as an RPATH.
+* Dynamic nginx modules prefer the shared zstd library so they do not embed a non-PIC static archive. Static nginx builds prefer the static library.
+* The system zstd library is used when `ZSTD_INC` and `ZSTD_LIB` are not specified.
 * Both `ngx_http_zstd_static_module` and `ngx_http_zstd_filter_module` will be configured.
 
 # Directives
@@ -145,7 +145,7 @@ The `ngx_http_zstd_static_module` module allows sending precompressed files with
 **Default:** *zstd_static off;*  
 **Context:** *http, server, location*  
 
-Enables ("on") or disables ("off") checking the existence of precompressed files. The following directives are also taken into account: `gzip_vary`.
+Enables ("on") or disables ("off") checking the existence of precompressed files. When a `.zst` variant exists, negotiated responses emit `Vary: Accept-Encoding` independently of `gzip_vary`.
 
 With the _"always"_ value, "zstd" file is used in all cases, without checking if the client supports it.
 

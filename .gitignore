@@ -57,3 +57,4 @@ t/servroot/*
 t/servroot*/
 test-error.log
 test-error-asan.log
+t/suite/large.bin

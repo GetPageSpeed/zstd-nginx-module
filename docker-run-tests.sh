@@ -51,6 +51,13 @@ cd "$MODULE_DIR"
 # originally written against (2018-11-06) to make those ETags deterministic.
 if [ -d t/suite ]; then
     touch -d @1541504307 t/suite/test t/suite/test.zst 2>/dev/null || true
+
+    # Deterministic, incompressible data large enough to cross both
+    # ZSTD_CStreamInSize() and several deliberately small output buffers.
+    perl -MDigest::SHA=sha256 -e '
+        binmode STDOUT;
+        print sha256(pack("N", $_)) for 0 .. 8191;
+    ' > t/suite/large.bin
 fi
 
 TEST_FILE=${1:-t/*.t}
