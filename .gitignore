@@ -58,3 +58,6 @@ t/servroot*/
 test-error.log
 test-error-asan.log
 t/suite/large.bin
+fuzz_accept_encoding
+crash-*
+corpus-min/
